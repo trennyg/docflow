@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { generateReferralCode } from "@/lib/referral";
 
 function VerifyForm() {
   const router = useRouter();
@@ -78,13 +79,26 @@ function VerifyForm() {
         .maybeSingle();
 
       if (!existingOrg) {
+        const refCookie = document.cookie
+          .split("; ")
+          .find((r) => r.startsWith("docflow_ref="))
+          ?.split("=")[1] ?? null;
+
         await supabase.from("organizations").insert({
           id: user.id,
           email,
           plan: "free",
           credits_used: 0,
           credits_limit: 15,
+          referral_code: generateReferralCode(),
+          notify_on_complete: true,
+          referred_by: refCookie,
         });
+
+        // Clear ref cookie after use
+        if (refCookie) {
+          document.cookie = "docflow_ref=; path=/; max-age=0";
+        }
       }
     }
 
