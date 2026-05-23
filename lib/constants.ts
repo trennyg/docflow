@@ -1,3 +1,58 @@
+export const PLANS = {
+  free: {
+    label: "Free",
+    limit: 15,
+    price: 0,
+    annualPrice: 0,
+    features: [
+      "15 applicants / month",
+      "PDF, JPG, PNG, HEIC",
+      "KYC extraction",
+      "Excel export",
+    ],
+  },
+  starter: {
+    label: "Starter",
+    limit: 100,
+    price: 199,
+    annualPrice: 166,
+    features: [
+      "100 applicants / month",
+      "Everything in Free",
+      "Priority processing",
+      "Email support",
+    ],
+  },
+  growth: {
+    label: "Growth",
+    limit: 350,
+    price: 499,
+    annualPrice: 415,
+    features: [
+      "350 applicants / month",
+      "Everything in Starter",
+      "API access (coming soon)",
+      "Phone support",
+    ],
+  },
+  unlimited: {
+    label: "Unlimited",
+    limit: -1,
+    price: 899,
+    annualPrice: 749,
+    features: [
+      "Unlimited applicants",
+      "Everything in Growth",
+      "Dedicated account manager",
+      "Custom integrations",
+    ],
+  },
+} as const;
+
+export type PlanKey = keyof typeof PLANS;
+
+export const PLAN_ORDER: PlanKey[] = ["free", "starter", "growth", "unlimited"];
+
 export const DOC_TYPES = [
   { value: "pan", label: "PAN Card" },
   { value: "aadhaar", label: "Aadhaar Card" },
