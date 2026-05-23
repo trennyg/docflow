@@ -7,18 +7,18 @@ import { createClient } from "@/lib/supabase/client";
 export default function VerifyPage() {
   const router = useRouter();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("docflow_phone");
+    const stored = sessionStorage.getItem("docflow_email");
     if (!stored) {
       router.replace("/login");
       return;
     }
-    setPhone(stored);
+    setEmail(stored);
     inputRefs.current[0]?.focus();
   }, [router]);
 
@@ -57,9 +57,9 @@ export default function VerifyPage() {
     const supabase = createClient();
 
     const { data, error: verifyError } = await supabase.auth.verifyOtp({
-      phone,
+      email,
       token: code,
-      type: "sms",
+      type: "email",
     });
 
     if (verifyError) {
@@ -80,7 +80,7 @@ export default function VerifyPage() {
       if (!existingOrg) {
         await supabase.from("organizations").insert({
           id: user.id,
-          phone,
+          email,
           plan: "free",
           credits_used: 0,
           credits_limit: 15,
@@ -88,7 +88,7 @@ export default function VerifyPage() {
       }
     }
 
-    sessionStorage.removeItem("docflow_phone");
+    sessionStorage.removeItem("docflow_email");
     router.replace("/app/dashboard");
   }
 
@@ -110,7 +110,7 @@ export default function VerifyPage() {
           </h2>
           <p className="text-text-muted text-sm mb-6">
             We sent a 6-digit code to{" "}
-            <span className="text-text-primary font-mono">{phone}</span>
+            <span className="text-text-primary font-mono">{email}</span>
           </p>
 
           <form onSubmit={handleVerify} className="space-y-6">

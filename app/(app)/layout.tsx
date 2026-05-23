@@ -20,7 +20,7 @@ export default async function AppLayout({
     .eq("id", user.id)
     .maybeSingle();
 
-  const orgName = org?.name ?? user.phone ?? "My Org";
+  const orgName = org?.name ?? user.email ?? "My Org";
   const plan = org?.plan ?? "free";
 
   return (

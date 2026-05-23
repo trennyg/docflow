@@ -56,9 +56,9 @@ lib/supabase/, lib/api.ts, lib/constants.ts
 
 \## Auth
 
-Phone OTP only. No email. No password.
+Email OTP only. No password. No phone.
 
-/login → phone input → send OTP
+/login → email input → send OTP
 
 /verify → 6-digit OTP → redirect to /dashboard
 
@@ -70,7 +70,7 @@ On first login: auto-create org record in DB.
 
 \## Database
 
-Organizations table: id, name, phone, plan (default free), credits\_used (default 0), credits\_limit (default 15)
+Organizations table: id, name, email, plan (default free), credits\_used (default 0), credits\_limit (default 15)
 
 Users table: id, org\_id, role
 
