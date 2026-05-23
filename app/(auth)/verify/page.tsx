@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function VerifyPage() {
+function VerifyForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,14 +14,14 @@ export default function VerifyPage() {
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("docflow_email");
-    if (!stored) {
+    const emailParam = searchParams.get("email");
+    if (!emailParam) {
       router.replace("/login");
       return;
     }
-    setEmail(stored);
+    setEmail(emailParam);
     inputRefs.current[0]?.focus();
-  }, [router]);
+  }, [router, searchParams]);
 
   function handleChange(index: number, value: string) {
     if (!/^\d*$/.test(value)) return;
@@ -46,8 +47,8 @@ export default function VerifyPage() {
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    const code = otp.join("");
-    if (code.length !== 6) {
+    const token = otp.join("");
+    if (token.length !== 6) {
       setError("Enter all 6 digits.");
       return;
     }
@@ -58,7 +59,7 @@ export default function VerifyPage() {
 
     const { data, error: verifyError } = await supabase.auth.verifyOtp({
       email,
-      token: code,
+      token,
       type: "email",
     });
 
@@ -70,7 +71,6 @@ export default function VerifyPage() {
 
     const user = data.user;
     if (user) {
-      // Auto-create org on first login
       const { data: existingOrg } = await supabase
         .from("organizations")
         .select("id")
@@ -88,10 +88,60 @@ export default function VerifyPage() {
       }
     }
 
-    sessionStorage.removeItem("docflow_email");
     router.replace("/app/dashboard");
   }
 
+  return (
+    <div className="bg-card border border-border rounded-xl p-6">
+      <h2 className="text-lg font-medium text-text-primary mb-1">
+        Enter OTP
+      </h2>
+      <p className="text-text-muted text-sm mb-6">
+        We sent a 6-digit code to{" "}
+        <span className="text-text-primary font-mono">{email}</span>
+      </p>
+
+      <form onSubmit={handleVerify} className="space-y-6">
+        <div className="flex gap-2 justify-between" onPaste={handlePaste}>
+          {otp.map((digit, i) => (
+            <input
+              key={i}
+              ref={(el) => { inputRefs.current[i] = el; }}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={(e) => handleChange(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              className="w-12 h-12 text-center text-lg font-mono text-text-primary bg-bg border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            />
+          ))}
+        </div>
+
+        {error && (
+          <p className="text-error text-sm font-mono">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+        >
+          {loading ? "Verifying…" : "Verify"}
+        </button>
+      </form>
+
+      <button
+        onClick={() => router.push("/login")}
+        className="w-full mt-3 text-text-muted hover:text-text-primary text-sm transition-colors"
+      >
+        ← Back to login
+      </button>
+    </div>
+  );
+}
+
+export default function VerifyPage() {
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -103,53 +153,9 @@ export default function VerifyPage() {
             Document intelligence for Indian businesses
           </p>
         </div>
-
-        <div className="bg-card border border-border rounded-xl p-6">
-          <h2 className="text-lg font-medium text-text-primary mb-1">
-            Enter OTP
-          </h2>
-          <p className="text-text-muted text-sm mb-6">
-            We sent a 6-digit code to{" "}
-            <span className="text-text-primary font-mono">{email}</span>
-          </p>
-
-          <form onSubmit={handleVerify} className="space-y-6">
-            <div className="flex gap-2 justify-between" onPaste={handlePaste}>
-              {otp.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={(el) => { inputRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleChange(i, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(i, e)}
-                  className="w-12 h-12 text-center text-lg font-mono text-text-primary bg-bg border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                />
-              ))}
-            </div>
-
-            {error && (
-              <p className="text-error text-sm font-mono">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-            >
-              {loading ? "Verifying…" : "Verify"}
-            </button>
-          </form>
-
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full mt-3 text-text-muted hover:text-text-primary text-sm transition-colors"
-          >
-            ← Back to login
-          </button>
-        </div>
+        <Suspense fallback={<div className="bg-card border border-border rounded-xl p-6 text-text-muted text-sm">Loading…</div>}>
+          <VerifyForm />
+        </Suspense>
       </div>
     </div>
   );

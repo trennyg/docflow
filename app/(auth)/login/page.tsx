@@ -26,7 +26,6 @@ export default function LoginPage() {
       email: trimmed,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: undefined,
       },
     });
 
@@ -36,8 +35,7 @@ export default function LoginPage() {
       return;
     }
 
-    sessionStorage.setItem("docflow_email", trimmed);
-    router.push("/verify");
+    router.push(`/verify?email=${encodeURIComponent(trimmed)}`);
   }
 
   return (
