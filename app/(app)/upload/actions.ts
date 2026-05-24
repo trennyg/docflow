@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/server-auth";
 import { DUMMY_EXTRACTED } from "@/lib/api";
 import { mapColumnsToFields, FieldKey } from "@/lib/constants";
 import type { DocType } from "@/lib/constants";
+import { sendJobCompleteEmail } from "@/lib/resend";
 
 // Default column headers when no existing Excel has been uploaded
 const DEFAULT_COLS: { header: string; field: FieldKey }[] = [
@@ -100,7 +101,7 @@ export async function processUpload(formData: FormData): Promise<{
   // Quota check (monthly pages + addon pages)
   const { data: org } = await supabase
     .from("organizations")
-    .select("credits_used, credits_limit, addon_pages, column_mapping")
+    .select("credits_used, credits_limit, addon_pages, column_mapping, notify_on_complete")
     .eq("id", orgId)
     .single();
 
@@ -186,6 +187,15 @@ export async function processUpload(formData: FormData): Promise<{
   // Append row to master sheet
   const columnMapping = (org?.column_mapping ?? null) as Record<string, FieldKey> | null;
   await appendToMasterSheet(supabase as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>, orgId, extracted, columnMapping);
+
+  // Send completion email if notifications are enabled
+  if (org?.notify_on_complete && user.email) {
+    try {
+      await sendJobCompleteEmail({ to: user.email, pageCount: totalPages, jobId });
+    } catch {
+      // Non-fatal — never block the upload flow
+    }
+  }
 
   return { jobId, extracted };
 }
