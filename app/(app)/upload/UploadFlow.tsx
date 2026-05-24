@@ -149,6 +149,27 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
   async function handleProcessProd(activeApplicants: Applicant[]) {
     const supabase = createClient();
 
+    // Count files that will actually be uploaded
+    const totalDocs = activeApplicants.reduce(
+      (sum, a) => sum + a.fileIds.filter((id) => !!files[id]).length,
+      0
+    );
+
+    // Check document quota before touching the database
+    setProgress("Checking quota…");
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("credits_used, credits_limit")
+      .eq("id", orgId)
+      .single();
+
+    if (org && org.credits_limit !== -1 && org.credits_used + totalDocs > org.credits_limit) {
+      const remaining = Math.max(0, org.credits_limit - org.credits_used);
+      throw new Error(
+        `You have ${remaining.toLocaleString()} document${remaining !== 1 ? "s" : ""} remaining this month. Upgrade to process more.`
+      );
+    }
+
     // 1. Create job
     setProgress("Creating job…");
     const { data: job, error: jobErr } = await supabase
@@ -209,8 +230,12 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
         .eq("id", applicantId);
     }
 
-    // 3. Mark job complete
+    // 3. Mark job complete and record document usage
     await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
+    await supabase
+      .from("organizations")
+      .update({ credits_used: (org?.credits_used ?? 0) + totalDocs })
+      .eq("id", orgId);
     router.push(`/jobs/${jobId}`);
   }
 

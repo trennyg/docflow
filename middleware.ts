@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Usage limit check: block access to /upload when at limit
+  // Document quota check: block navigation to /upload when monthly limit reached
   if (pathname === "/upload" && user) {
     const { data: org } = await supabase
       .from("organizations")

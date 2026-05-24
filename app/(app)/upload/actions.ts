@@ -26,6 +26,21 @@ export async function devProcessUpload(formData: FormData): Promise<{ jobId: str
   const orgId = cookieStore.get("dev_org_id")?.value ?? DEV_USER_ID;
 
   const applicants: ApplicantEntry[] = JSON.parse(formData.get("applicants") as string);
+  const totalDocs = applicants.reduce((sum, a) => sum + a.fileKeys.length, 0);
+
+  // Check document quota
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("credits_used, credits_limit")
+    .eq("id", orgId)
+    .single();
+
+  if (org && org.credits_limit !== -1 && org.credits_used + totalDocs > org.credits_limit) {
+    const remaining = Math.max(0, org.credits_limit - org.credits_used);
+    throw new Error(
+      `You have ${remaining.toLocaleString()} document${remaining !== 1 ? "s" : ""} remaining this month.`
+    );
+  }
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -86,6 +101,12 @@ export async function devProcessUpload(formData: FormData): Promise<{ jobId: str
   }
 
   await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
+
+  // Record document usage
+  await supabase
+    .from("organizations")
+    .update({ credits_used: (org?.credits_used ?? 0) + totalDocs })
+    .eq("id", orgId);
 
   return { jobId };
 }

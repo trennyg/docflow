@@ -16,7 +16,7 @@ export async function POST() {
       name: "Dev Org",
       plan: "starter",
       credits_used: 3,
-      credits_limit: 100,
+      credits_limit: 300,
       notify_on_complete: true,
     },
     { onConflict: "id", ignoreDuplicates: true }
