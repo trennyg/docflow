@@ -3,11 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.mjs",
-  import.meta.url
-).toString();
-
 type Props = {
   file: File;
   pageCount: number;
@@ -20,6 +15,8 @@ export default function PagePreview({ file, pageCount, removedPages, onRemovePag
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;

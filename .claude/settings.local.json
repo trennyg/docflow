@@ -14,7 +14,10 @@
       "Bash(npx tsx *)",
       "Bash(node -e \"require\\('xlsx'\\); console.log\\('xlsx ok'\\)\")",
       "Bash(node --experimental-strip-types --version)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 npm run *)"
     ]
   }
 }

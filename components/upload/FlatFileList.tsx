@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { DOC_TYPES, DocType } from "@/lib/constants";
-import PagePreview from "./PagePreview";
+
+const PagePreview = dynamic(() => import("./PagePreview"), { ssr: false, loading: () => null });
 
 export type UploadFile = {
   id: string;
