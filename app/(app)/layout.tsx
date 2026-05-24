@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/server-auth";
 import Sidebar from "@/components/dashboard/Sidebar";
+import SignOutButton from "@/components/dashboard/SignOutButton";
 
 export default async function AppLayout({
   children,
@@ -30,15 +31,18 @@ export default async function AppLayout({
         )}
         <header className="h-14 border-b border-border flex items-center justify-between px-6">
           <span className="text-text-primary font-medium text-sm">{orgName}</span>
-          <span
-            className={`font-mono text-xs px-2.5 py-1 rounded-full border ${
-              plan === "pro"
-                ? "border-accent text-accent bg-accent/10"
-                : "border-border text-text-muted bg-card"
-            }`}
-          >
-            {plan.toUpperCase()}
-          </span>
+          <div className="flex items-center gap-4">
+            <span
+              className={`font-mono text-xs px-2.5 py-1 rounded-full border ${
+                plan === "pro"
+                  ? "border-accent text-accent bg-accent/10"
+                  : "border-border text-text-muted bg-card"
+              }`}
+            >
+              {plan.toUpperCase()}
+            </span>
+            <SignOutButton />
+          </div>
         </header>
         <main className="flex-1 p-6">{children}</main>
       </div>
