@@ -10,7 +10,11 @@
       "Bash(npx tsc *)",
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\trenn\\\\docflow\\\\.next\\\\types\" -ErrorAction SilentlyContinue)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npx tsx *)",
+      "Bash(node -e \"require\\('xlsx'\\); console.log\\('xlsx ok'\\)\")",
+      "Bash(node --experimental-strip-types --version)",
+      "Bash(node *)"
     ]
   }
 }

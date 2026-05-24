@@ -41,7 +41,7 @@ export default function UploadFlow({
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
-  const [masterSheetUrl, setMasterSheetUrl] = useState<string | null>(null);
+  const [masterSheet, setMasterSheet] = useState<{ url: string; filename: string } | null>(null);
 
   // Excel upload state
   const [excelUploading, setExcelUploading] = useState(false);
@@ -148,9 +148,9 @@ export default function UploadFlow({
       const result = await processUpload(fd);
 
       setProgress("Getting download link…");
-      const url = await getMasterSheetUrl();
+      const sheet = await getMasterSheetUrl();
       setExtracted(result.extracted);
-      setMasterSheetUrl(url);
+      setMasterSheet(sheet);
       setStage("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -164,7 +164,7 @@ export default function UploadFlow({
   function handleAddAnother() {
     setFiles({});
     setExtracted({});
-    setMasterSheetUrl(null);
+    setMasterSheet(null);
     setError("");
     setStage("upload");
   }
@@ -202,10 +202,10 @@ export default function UploadFlow({
         </div>
 
         <div className="flex gap-3 flex-wrap">
-          {masterSheetUrl && (
+          {masterSheet && (
             <a
-              href={masterSheetUrl}
-              download="master_sheet.xlsx"
+              href={masterSheet.url}
+              download={masterSheet.filename}
               className="flex items-center gap-2 bg-success/10 hover:bg-success/20 border border-success/30 text-success text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

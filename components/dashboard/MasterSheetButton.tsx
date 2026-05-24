@@ -9,11 +9,11 @@ export default function MasterSheetButton() {
   async function handleDownload() {
     setLoading(true);
     try {
-      const url = await getMasterSheetUrl();
-      if (url) {
+      const result = await getMasterSheetUrl();
+      if (result) {
         const a = document.createElement("a");
-        a.href = url;
-        a.download = "master_sheet.xlsx";
+        a.href = result.url;
+        a.download = result.filename;
         a.click();
       }
     } finally {

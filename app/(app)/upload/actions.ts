@@ -2,38 +2,21 @@
 
 import * as XLSX from "xlsx";
 import { requireUser } from "@/lib/server-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DUMMY_EXTRACTED } from "@/lib/api";
-import { mapColumnsToFields, FieldKey } from "@/lib/constants";
+import { mapColumnsToFields, matchColumn, FieldKey } from "@/lib/constants";
 import type { DocType } from "@/lib/constants";
 import { sendJobCompleteEmail } from "@/lib/resend";
 
-// Default column headers when no existing Excel has been uploaded
-const DEFAULT_COLS: { header: string; field: FieldKey }[] = [
-  { header: "Name", field: "name" },
-  { header: "PAN Number", field: "pan_number" },
-  { header: "Aadhaar Number", field: "aadhaar_number" },
-  { header: "Date of Birth", field: "dob" },
-  { header: "Phone", field: "phone" },
-  { header: "Address", field: "address" },
-  { header: "Father Name", field: "father_name" },
-  { header: "Gender", field: "gender" },
-  { header: "Passport Number", field: "passport_number" },
-  { header: "Employer", field: "employer" },
-  { header: "Salary", field: "salary" },
-  { header: "Email", field: "email" },
-  { header: "Pincode", field: "pincode" },
-  { header: "City", field: "city" },
-  { header: "State", field: "state" },
-];
 
 type FileEntry = { fileKey: string; docType: DocType; pageCount: number; pages: number[] | null };
 
 async function appendToMasterSheet(
-  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
   orgId: string,
   extracted: Record<string, string>,
   columnMapping: Record<string, FieldKey> | null
 ): Promise<void> {
+  const supabase = createAdminClient();
   const masterPath = `${orgId}/master_sheet.xlsx`;
   let wb: XLSX.WorkBook;
   let ws: XLSX.WorkSheet;
@@ -52,34 +35,27 @@ async function appendToMasterSheet(
     headers = (rows[0] as unknown as string[]) ?? [];
   } else {
     wb = XLSX.utils.book_new();
-    headers = columnMapping
-      ? Object.keys(columnMapping)
-      : DEFAULT_COLS.map((c) => c.header);
+    headers = columnMapping ? Object.keys(columnMapping) : Object.keys(extracted);
     ws = XLSX.utils.aoa_to_sheet([headers]);
     XLSX.utils.book_append_sheet(wb, ws, "Extractions");
   }
 
   // Build the new row in the correct column order
   const row = headers.map((header) => {
-    let field: FieldKey | undefined;
-    if (columnMapping) {
-      field = columnMapping[header];
-    } else {
-      const col = DEFAULT_COLS.find((c) => c.header === header);
-      field = col?.field;
-    }
+    const field = columnMapping ? columnMapping[header] : matchColumn(header);
     return field ? (extracted[field] ?? "") : "";
   });
 
   XLSX.utils.sheet_add_aoa(ws, [row], { origin: -1 });
 
   const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from("documents")
     .upload(masterPath, xlsxBuffer, {
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       upsert: true,
     });
+  console.log("Master sheet upload result:", uploadError);
   // Mark has_master_sheet on org (idempotent)
   await supabase
     .from("organizations")
@@ -186,7 +162,7 @@ export async function processUpload(formData: FormData): Promise<{
 
   // Append row to master sheet
   const columnMapping = (org?.column_mapping ?? null) as Record<string, FieldKey> | null;
-  await appendToMasterSheet(supabase as ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>, orgId, extracted, columnMapping);
+  await appendToMasterSheet(orgId, extracted, columnMapping);
 
   // Send completion email if notifications are enabled
   if (org?.notify_on_complete && user.email) {
@@ -214,6 +190,8 @@ export async function uploadExistingExcel(formData: FormData): Promise<void> {
   const headers: string[] = (rows[0] as unknown as string[]) ?? [];
 
   const columnMapping = mapColumnsToFields(headers);
+  console.log("uploadExistingExcel — orgId:", orgId);
+  console.log("uploadExistingExcel — columnMapping:", JSON.stringify(columnMapping));
 
   // Save their Excel as the master sheet
   await supabase.storage
@@ -223,17 +201,23 @@ export async function uploadExistingExcel(formData: FormData): Promise<void> {
       upsert: true,
     });
 
-  // Save column mapping and mark master sheet active
-  await supabase
+  // Save column mapping, filename, and mark master sheet active
+  const { data: updateData, error: updateError } = await supabase
     .from("organizations")
-    .update({ column_mapping: columnMapping, has_master_sheet: true })
+    .update({ column_mapping: columnMapping, has_master_sheet: true, master_sheet_filename: file.name })
     .eq("id", orgId);
+  console.log("uploadExistingExcel — update result:", { data: updateData, error: updateError });
 }
 
-export async function getMasterSheetUrl(): Promise<string | null> {
+export async function getMasterSheetUrl(): Promise<{ url: string; filename: string } | null> {
   const { supabase, user } = await requireUser();
-  const { data } = await supabase.storage
-    .from("documents")
-    .createSignedUrl(`${user.id}/master_sheet.xlsx`, 60);
-  return data?.signedUrl ?? null;
+  const [{ data: urlData }, { data: org }] = await Promise.all([
+    supabase.storage.from("documents").createSignedUrl(`${user.id}/master_sheet.xlsx`, 60),
+    supabase.from("organizations").select("master_sheet_filename").eq("id", user.id).single(),
+  ]);
+  if (!urlData?.signedUrl) return null;
+  return {
+    url: urlData.signedUrl,
+    filename: org?.master_sheet_filename ?? "master_sheet.xlsx",
+  };
 }
