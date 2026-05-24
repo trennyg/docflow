@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEV_USER_ID } from "@/lib/server-auth";
+import { PLANS } from "@/lib/constants";
 
 export async function POST() {
   if (process.env.NODE_ENV !== "development") {
@@ -16,7 +17,7 @@ export async function POST() {
       name: "Dev Org",
       plan: "starter",
       credits_used: 3,
-      credits_limit: 300,
+      credits_limit: PLANS.starter.limit,
       notify_on_complete: true,
     },
     { onConflict: "id", ignoreDuplicates: true }

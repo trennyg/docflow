@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generateReferralCode } from "@/lib/referral";
+import { PLANS } from "@/lib/constants";
 
 function VerifyForm() {
   const router = useRouter();
@@ -89,7 +90,7 @@ function VerifyForm() {
           email,
           plan: "free",
           credits_used: 0,
-          credits_limit: 15,
+          credits_limit: PLANS.free.limit,
           referral_code: generateReferralCode(),
           notify_on_complete: true,
           referred_by: refCookie,
