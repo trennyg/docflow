@@ -3,20 +3,32 @@ import Link from "next/link";
 type Job = {
   id: string;
   status: string;
+  page_count: number | null;
   created_at: string;
-  applicants: { label: string; extracted: Record<string, string> | null }[] | null;
+  applicants: { extracted: Record<string, string> | null }[] | null;
 };
 
-type Props = {
-  jobs: Job[];
-};
+type Props = { jobs: Job[] };
 
 const STATUS_STYLE: Record<string, string> = {
-  complete: "text-success bg-success/10 border-success/30",
+  complete:   "text-success bg-success/10 border-success/30",
   processing: "text-accent bg-accent/10 border-accent/30",
-  queued: "text-text-muted bg-card border-border",
-  failed: "text-error bg-error/10 border-error/30",
+  queued:     "text-text-muted bg-card border-border",
+  failed:     "text-error bg-error/10 border-error/30",
 };
+
+function extractedName(job: Job): string {
+  const ext = job.applicants?.[0]?.extracted;
+  if (!ext) return "—";
+  return (
+    ext["name"] ??
+    ext["employee_name"] ??
+    ext["account_holder"] ??
+    ext["consumer_name"] ??
+    ext["buyer_name"] ??
+    "—"
+  );
+}
 
 export default function RecentJobs({ jobs }: Props) {
   if (jobs.length === 0) {
@@ -44,40 +56,29 @@ export default function RecentJobs({ jobs }: Props) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-bg/20">
-            {["Date", "Person", "Status", ""].map((h) => (
+            {["Date", "Person", "Pages", "Status", ""].map((h) => (
               <th key={h} className="text-left text-text-muted font-mono text-xs font-medium px-5 py-2.5">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {jobs.map((job) => {
-            const applicant = job.applicants?.[0];
-            const personName =
-              applicant?.extracted?.["name"] ??
-              applicant?.extracted?.["employee_name"] ??
-              applicant?.extracted?.["account_holder"] ??
-              applicant?.extracted?.["consumer_name"] ??
-              "—";
-
-            return (
-              <tr key={job.id} className="hover:bg-bg/40 transition-colors">
-                <td className="px-5 py-3 text-text-muted font-mono text-xs">
-                  {new Date(job.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                </td>
-                <td className="px-5 py-3 text-text-primary font-mono text-xs">{personName}</td>
-                <td className="px-5 py-3">
-                  <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLE[job.status] ?? STATUS_STYLE.queued}`}>
-                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <Link href={`/jobs/${job.id}`} className="text-accent text-xs hover:underline font-mono">
-                    View →
-                  </Link>
-                </td>
-              </tr>
-            );
-          })}
+          {jobs.map((job) => (
+            <tr key={job.id} className="hover:bg-bg/40 transition-colors">
+              <td className="px-5 py-3 text-text-muted font-mono text-xs">
+                {new Date(job.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+              </td>
+              <td className="px-5 py-3 text-text-primary font-mono text-xs">{extractedName(job)}</td>
+              <td className="px-5 py-3 text-text-muted font-mono text-xs">{job.page_count ?? "—"}</td>
+              <td className="px-5 py-3">
+                <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLE[job.status] ?? STATUS_STYLE.queued}`}>
+                  {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                </span>
+              </td>
+              <td className="px-5 py-3 text-right">
+                <Link href={`/jobs/${job.id}`} className="text-accent text-xs hover:underline font-mono">View →</Link>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

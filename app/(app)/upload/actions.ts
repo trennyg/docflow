@@ -79,6 +79,11 @@ async function appendToMasterSheet(
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       upsert: true,
     });
+  // Mark has_master_sheet on org (idempotent)
+  await supabase
+    .from("organizations")
+    .update({ has_master_sheet: true })
+    .eq("id", orgId);
 }
 
 export async function processUpload(formData: FormData): Promise<{
@@ -110,17 +115,17 @@ export async function processUpload(formData: FormData): Promise<{
   // Create job (one job = one applicant = one row)
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .insert({ org_id: orgId, status: "processing", job_type: "kyc", applicant_count: 1 })
+    .insert({ org_id: orgId, status: "processing", job_type: "basic", page_count: totalPages })
     .select("id")
     .single();
 
   if (jobErr || !job) throw new Error(jobErr?.message ?? "Failed to create job");
   const jobId: string = job.id;
 
-  // Create applicant record
+  // Create applicant record (no label in v2 schema)
   const { data: appRecord } = await supabase
     .from("applicants")
-    .insert({ job_id: jobId, org_id: orgId, label: "Applicant", status: "pending" })
+    .insert({ job_id: jobId, org_id: orgId, status: "pending" })
     .select("id")
     .single();
 
@@ -160,7 +165,7 @@ export async function processUpload(formData: FormData): Promise<{
     .update({ status: "complete", extracted })
     .eq("id", applicantId);
 
-  await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
+  await supabase.from("jobs").update({ status: "complete", completed_at: new Date().toISOString() }).eq("id", jobId);
 
   // Deduct pages: use monthly allowance first, then addon pages
   const monthlyUsed = org?.credits_used ?? 0;
@@ -208,10 +213,10 @@ export async function uploadExistingExcel(formData: FormData): Promise<void> {
       upsert: true,
     });
 
-  // Save the column mapping
+  // Save column mapping and mark master sheet active
   await supabase
     .from("organizations")
-    .update({ column_mapping: columnMapping })
+    .update({ column_mapping: columnMapping, has_master_sheet: true })
     .eq("id", orgId);
 }
 
