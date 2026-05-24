@@ -16,30 +16,20 @@ export default function UsageBar({ used, limit, plan }: Props) {
   const days = daysUntilReset();
 
   const barColor =
-    pct >= 100
-      ? "bg-error"
-      : pct >= 80
-      ? "bg-warning"
-      : "bg-success";
+    pct >= 100 ? "bg-error" : pct >= 80 ? "bg-warning" : "bg-success";
 
   const textColor =
-    pct >= 100
-      ? "text-error"
-      : pct >= 80
-      ? "text-warning"
-      : "text-text-muted";
+    pct >= 100 ? "text-error" : pct >= 80 ? "text-warning" : "text-text-muted";
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-text-primary text-sm font-medium">
-            Applicant usage
-          </p>
+          <p className="text-text-primary text-sm font-medium">Document usage</p>
           <p className={`text-xs font-mono mt-0.5 ${textColor}`}>
             {unlimited
-              ? "Unlimited applicants"
-              : `${used} of ${limit} applicants used this month`}
+              ? "Unlimited documents"
+              : `${used.toLocaleString()} of ${limit.toLocaleString()} documents used this month`}
           </p>
         </div>
         <div className="text-right">
@@ -62,14 +52,18 @@ export default function UsageBar({ used, limit, plan }: Props) {
           </div>
           <div className="flex justify-between text-xs font-mono text-text-muted">
             <span>{pct}% used</span>
-            <span>{limit - used > 0 ? `${limit - used} remaining` : "Limit reached"}</span>
+            <span>
+              {limit - used > 0
+                ? `${(limit - used).toLocaleString()} remaining`
+                : "Limit reached"}
+            </span>
           </div>
         </div>
       )}
 
       {pct >= 100 && (
         <p className="text-error text-xs font-mono">
-          You&apos;ve reached your monthly limit. Upgrade to process more applicants.
+          You&apos;ve reached your monthly limit. Upgrade to process more documents.
         </p>
       )}
     </div>

@@ -94,8 +94,8 @@ export default function LandingPricing() {
                 )}
                 <p className="text-text-muted text-xs font-mono mt-1">
                   {plan.limit === -1
-                    ? "Unlimited applicants"
-                    : `${plan.limit} applicants/mo`}
+                    ? "Unlimited documents"
+                    : `${plan.limit.toLocaleString()} documents/mo`}
                 </p>
               </div>
 

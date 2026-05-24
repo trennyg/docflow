@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Docflow — Document intelligence for Indian businesses",
   description:
-    "Upload your client documents. Get a structured Excel file in under 2 minutes. ₹199/month. First 15 clients free.",
+    "Upload your client documents. Get a structured Excel file in under 2 minutes. ₹199/month. First 45 documents free.",
 };
 
 export default function MarketingLayout({

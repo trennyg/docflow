@@ -62,8 +62,8 @@ export default async function BillingPage({
             </p>
             <p className="text-text-muted text-xs mt-0.5">
               {plan === "free"
-                ? "Upgrade to Starter for ₹199/month to process up to 100 applicants."
-                : "Upgrade your plan to process more applicants this month."}
+                ? "Upgrade to Starter for ₹199/month to process up to 300 documents."
+                : "Upgrade your plan to process more documents this month."}
             </p>
           </div>
           <svg

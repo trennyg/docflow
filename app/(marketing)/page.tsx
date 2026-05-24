@@ -14,7 +14,7 @@ export default function LandingPage() {
         </h1>
         <p className="mt-6 text-text-muted text-lg leading-relaxed max-w-2xl mx-auto">
           Upload your client documents. Get a structured Excel file in under 2
-          minutes. ₹199/month. First 15 clients free.
+          minutes. ₹199/month. First 45 documents free.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
