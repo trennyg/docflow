@@ -80,17 +80,34 @@ export function detectDocType(filename: string): DocType {
   return "other";
 }
 
-export function detectApplicantName(filename: string): string {
+// Returns null when the filename looks generic (WhatsApp upload, camera timestamp, etc.)
+// so UploadFlow can assign "Applicant N" numbering instead.
+export function detectApplicantName(filename: string): string | null {
   const base = filename.replace(/\.[^.]+$/, "");
+
+  // WhatsApp exports: "WhatsApp Image 2024-01-15 at 10.30.45"
+  if (/whatsapp/i.test(base)) return null;
+
+  // Phone camera / app patterns: IMG_20240115_103045, Screenshot_2024-01-15, PANO_…
+  if (/^(img|image|photo|screenshot|pano|pic|dsc|copy|scan)[\s_\-]?\d/i.test(base)) return null;
+
+  // Bare date or timestamp filenames: 20240115_103045 or 2024-01-15
+  if (/^\d{4}[\-_.]?\d{2}[\-_.]?\d{2}/.test(base)) return null;
+
   const parts = base.split(/[_\-\s]+/).filter(Boolean);
   const docKw = [
     "pan", "aadhar", "aadhaar", "passport", "payslip", "salary",
     "bank", "statement", "itr", "form", "electricity", "bill",
-    "kyc", "doc", "scan", "img", "image", "file",
+    "kyc", "doc", "scan", "img", "image", "file", "photo", "whatsapp",
   ];
+
   const name = parts.find(
-    (p) => p.length >= 2 && !docKw.some((k) => p.toLowerCase().startsWith(k))
+    (p) =>
+      p.length >= 2 &&
+      !docKw.some((k) => p.toLowerCase().startsWith(k)) &&
+      !/^\d+$/.test(p)
   );
-  if (!name) return "Applicant 1";
+
+  if (!name) return null;
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }

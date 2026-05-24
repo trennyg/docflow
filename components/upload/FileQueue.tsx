@@ -85,9 +85,18 @@ export default function FileQueue({
             value={docType}
             onChange={(e) => onDocTypeChange(id, e.target.value as DocType)}
             onClick={(e) => e.stopPropagation()}
-            className="bg-card border border-border text-text-muted text-xs rounded px-1.5 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-accent shrink-0 max-w-[130px]"
+            className={`bg-card text-xs rounded px-1.5 py-1 font-mono focus:outline-none focus:ring-1 shrink-0 max-w-[140px] ${
+              docType === "other"
+                ? "border border-warning text-warning focus:ring-warning"
+                : "border border-border text-text-muted focus:ring-accent"
+            }`}
           >
-            {DOC_TYPES.map(({ value, label }) => (
+            {docType === "other" && (
+              <option value="other" disabled>
+                Select document type
+              </option>
+            )}
+            {DOC_TYPES.filter(({ value }) => value !== "other").map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
               </option>

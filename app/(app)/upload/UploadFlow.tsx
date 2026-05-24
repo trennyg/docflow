@@ -21,24 +21,32 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
   const [error, setError] = useState("");
 
   const totalFiles = Object.keys(files).length;
+  const hasUnselectedDocTypes = Object.values(files).some((f) => f.docType === "other");
 
   const handleFilesAdded = useCallback((newFiles: File[]) => {
     const nextFiles: Record<string, UploadFile> = {};
-    // applicant name → file ids
-    const nameMap: Record<string, string[]> = {};
-
     newFiles.forEach((file) => {
       const id = crypto.randomUUID();
       nextFiles[id] = { id, file, docType: detectDocType(file.name) };
-      const name = detectApplicantName(file.name);
-      if (!nameMap[name]) nameMap[name] = [];
-      nameMap[name].push(id);
     });
 
     setFiles((prev) => ({ ...prev, ...nextFiles }));
 
     setApplicants((prev) => {
       const next = prev.map((a) => ({ ...a, fileIds: [...a.fileIds] }));
+
+      // Continue numbering from however many auto-named applicants already exist
+      let fallbackSeq = next.filter((a) => /^Applicant \d+$/.test(a.label)).length + 1;
+
+      const nameMap: Record<string, string[]> = {};
+      Object.entries(nextFiles).forEach(([id, uf]) => {
+        const detected = detectApplicantName(uf.file.name);
+        // null = unrecognisable name (WhatsApp, timestamp, etc.) — each gets its own slot
+        const name = detected ?? `Applicant ${fallbackSeq++}`;
+        if (!nameMap[name]) nameMap[name] = [];
+        nameMap[name].push(id);
+      });
+
       Object.entries(nameMap).forEach(([name, ids]) => {
         const existing = next.find((a) => a.label === name);
         if (existing) {
@@ -224,26 +232,35 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
           )}
 
           <div className="flex items-center justify-between pt-2">
-            <p className="text-text-muted text-xs font-mono">
-              {submitting ? progress : "Ready to process"}
+            <p className={`text-xs font-mono ${hasUnselectedDocTypes ? "text-warning" : "text-text-muted"}`}>
+              {submitting
+                ? progress
+                : hasUnselectedDocTypes
+                ? "Select document type for all files"
+                : "Ready to process"}
             </p>
-            <button
-              onClick={handleProcess}
-              disabled={submitting}
-              className="bg-accent hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm flex items-center gap-2"
+            <span
+              title={hasUnselectedDocTypes ? "Please select document type for all files" : undefined}
+              className="inline-block"
             >
-              {submitting ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Processing…
-                </>
-              ) : (
-                "Process Documents →"
-              )}
-            </button>
+              <button
+                onClick={handleProcess}
+                disabled={submitting || hasUnselectedDocTypes}
+                className="bg-accent hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm flex items-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Processing…
+                  </>
+                ) : (
+                  "Process Documents →"
+                )}
+              </button>
+            </span>
           </div>
         </>
       )}
