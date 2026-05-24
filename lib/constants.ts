@@ -1,11 +1,11 @@
 export const PLANS = {
   free: {
     label: "Free",
-    limit: 15,
+    limit: 45,
     price: 0,
     annualPrice: 0,
     features: [
-      "15 applicants / month",
+      "45 documents / month",
       "PDF, JPG, PNG, HEIC",
       "KYC extraction",
       "Excel export",
@@ -13,11 +13,11 @@ export const PLANS = {
   },
   starter: {
     label: "Starter",
-    limit: 100,
+    limit: 300,
     price: 199,
     annualPrice: 166,
     features: [
-      "100 applicants / month",
+      "300 documents / month",
       "Everything in Free",
       "Priority processing",
       "Email support",
@@ -25,11 +25,11 @@ export const PLANS = {
   },
   growth: {
     label: "Growth",
-    limit: 350,
+    limit: 1050,
     price: 499,
     annualPrice: 415,
     features: [
-      "350 applicants / month",
+      "1,050 documents / month",
       "Everything in Starter",
       "API access (coming soon)",
       "Phone support",
@@ -37,11 +37,11 @@ export const PLANS = {
   },
   unlimited: {
     label: "Unlimited",
-    limit: -1,
+    limit: 15000,
     price: 899,
     annualPrice: 749,
     features: [
-      "Unlimited applicants",
+      "15,000 documents / month",
       "Everything in Growth",
       "Dedicated account manager",
       "Custom integrations",
