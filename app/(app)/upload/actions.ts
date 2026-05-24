@@ -25,7 +25,7 @@ const DEFAULT_COLS: { header: string; field: FieldKey }[] = [
   { header: "State", field: "state" },
 ];
 
-type FileEntry = { fileKey: string; docType: DocType };
+type FileEntry = { fileKey: string; docType: DocType; pageCount: number; pages: number[] | null };
 
 async function appendToMasterSheet(
   supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
@@ -89,19 +89,21 @@ export async function processUpload(formData: FormData): Promise<{
   const orgId = user.id;
 
   const files: FileEntry[] = JSON.parse(formData.get("files") as string);
-  const totalDocs = files.length;
+  // Total pages charged = sum of selected page counts per file
+  const totalPages = files.reduce((sum, f) => sum + f.pageCount, 0);
 
-  // Quota check
+  // Quota check (monthly pages + addon pages)
   const { data: org } = await supabase
     .from("organizations")
-    .select("credits_used, credits_limit, column_mapping")
+    .select("credits_used, credits_limit, addon_pages, column_mapping")
     .eq("id", orgId)
     .single();
 
-  if (org && org.credits_limit !== -1 && (org.credits_used ?? 0) + totalDocs > org.credits_limit) {
-    const remaining = Math.max(0, org.credits_limit - org.credits_used);
+  const monthlyRemaining = Math.max(0, (org?.credits_limit ?? 30) - (org?.credits_used ?? 0));
+  const totalRemaining = monthlyRemaining + (org?.addon_pages ?? 0);
+  if (org && org.credits_limit !== -1 && totalPages > totalRemaining) {
     throw new Error(
-      `You have ${remaining.toLocaleString()} document${remaining !== 1 ? "s" : ""} remaining this month.`
+      `You have ${totalRemaining.toLocaleString()} page${totalRemaining !== 1 ? "s" : ""} remaining. This upload uses ${totalPages} pages.`
     );
   }
 
@@ -160,10 +162,20 @@ export async function processUpload(formData: FormData): Promise<{
 
   await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
 
-  // Increment usage
+  // Deduct pages: use monthly allowance first, then addon pages
+  const monthlyUsed = org?.credits_used ?? 0;
+  const monthlyLimit = org?.credits_limit ?? 30;
+  const addonPages = org?.addon_pages ?? 0;
+  const monthlyAvailable = Math.max(0, monthlyLimit - monthlyUsed);
+  const fromMonthly = Math.min(totalPages, monthlyAvailable);
+  const fromAddon = totalPages - fromMonthly;
+
   await supabase
     .from("organizations")
-    .update({ credits_used: (org?.credits_used ?? 0) + totalDocs })
+    .update({
+      credits_used: monthlyUsed + fromMonthly,
+      addon_pages: Math.max(0, addonPages - fromAddon),
+    })
     .eq("id", orgId);
 
   // Append row to master sheet

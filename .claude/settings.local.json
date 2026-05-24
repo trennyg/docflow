@@ -9,7 +9,8 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\trenn\\\\docflow\\\\.next\\\\types\" -ErrorAction SilentlyContinue)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

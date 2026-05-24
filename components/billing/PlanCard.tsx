@@ -57,8 +57,8 @@ export default function PlanCard({ planKey, currentPlan, annual }: Props) {
         )}
         <p className="text-text-muted text-xs font-mono mt-1">
           {plan.limit === -1
-            ? "Unlimited documents"
-            : `${plan.limit.toLocaleString()} documents/month`}
+            ? "Unlimited pages"
+            : `${plan.limit.toLocaleString()} pages/month`}
         </p>
       </div>
 

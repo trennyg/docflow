@@ -3,6 +3,7 @@ import { PLANS, PlanKey } from "@/lib/constants";
 import UsageBar from "@/components/dashboard/UsageBar";
 import PlanSelector from "@/components/billing/PlanSelector";
 import UsageHistory from "@/components/billing/UsageHistory";
+import AddonPacks from "@/components/billing/AddonPacks";
 
 export default async function BillingPage({
   searchParams,
@@ -13,16 +14,16 @@ export default async function BillingPage({
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("name, plan, credits_used, credits_limit")
+    .select("name, plan, credits_used, credits_limit, addon_pages")
     .eq("id", user.id)
     .maybeSingle();
 
   const plan = (org?.plan ?? "free") as PlanKey;
   const planLabel = PLANS[plan]?.label ?? "Free";
   const creditsUsed = org?.credits_used ?? 0;
-  const creditsLimit = org?.credits_limit ?? 15;
+  const creditsLimit = org?.credits_limit ?? 30;
+  const addonPages = org?.addon_pages ?? 0;
 
-  // Fetch invoices (empty until Razorpay is wired)
   const { data: invoices } = await supabase
     .from("invoices")
     .select("id, date, amount, plan, pdf_url")
@@ -31,6 +32,7 @@ export default async function BillingPage({
     .limit(24);
 
   const limitReached = searchParams.upgrade === "1";
+  const remainingPages = Math.max(0, creditsLimit - creditsUsed) + addonPages;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -39,7 +41,7 @@ export default async function BillingPage({
         <div>
           <h1 className="text-text-primary text-xl font-semibold">Billing</h1>
           <p className="text-text-muted text-sm mt-0.5">
-            Manage your plan and usage
+            Manage your plan and page usage
           </p>
         </div>
         <span
@@ -58,34 +60,27 @@ export default async function BillingPage({
         <div className="bg-error/10 border border-error/30 rounded-xl px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-text-primary text-sm font-medium">
-              Monthly limit reached
+              Page limit reached
             </p>
             <p className="text-text-muted text-xs mt-0.5">
               {plan === "free"
-                ? "Upgrade to Starter for ₹199/month to process up to 300 documents."
-                : "Upgrade your plan to process more documents this month."}
+                ? `Upgrade to Starter for ₹199/month to get 130 pages, or buy extra pages below.`
+                : `You have ${remainingPages} pages remaining. Upgrade or buy extra pages below.`}
             </p>
           </div>
-          <svg
-            className="w-5 h-5 text-error shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
+          <svg className="w-5 h-5 text-error shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
         </div>
       )}
 
       {/* Usage bar */}
-      <UsageBar used={creditsUsed} limit={creditsLimit} plan={plan} />
+      <UsageBar used={creditsUsed} limit={creditsLimit} plan={plan} addonPages={addonPages} />
 
-      {/* Plan selector with toggle */}
+      {/* Addon packs */}
+      <AddonPacks />
+
+      {/* Plan selector */}
       <PlanSelector currentPlan={plan} />
 
       {/* Invoice history */}

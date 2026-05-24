@@ -2,6 +2,7 @@ type Props = {
   used: number;
   limit: number;
   plan: string;
+  addonPages?: number;
 };
 
 function daysUntilReset(): number {
@@ -10,7 +11,7 @@ function daysUntilReset(): number {
   return Math.ceil((first.getTime() - now.getTime()) / 86_400_000);
 }
 
-export default function UsageBar({ used, limit, plan }: Props) {
+export default function UsageBar({ used, limit, plan, addonPages = 0 }: Props) {
   const unlimited = limit === -1;
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const days = daysUntilReset();
@@ -25,11 +26,14 @@ export default function UsageBar({ used, limit, plan }: Props) {
     <div className="bg-card border border-border rounded-xl p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-text-primary text-sm font-medium">Document usage</p>
+          <p className="text-text-primary text-sm font-medium">Page usage</p>
           <p className={`text-xs font-mono mt-0.5 ${textColor}`}>
             {unlimited
-              ? "Unlimited documents"
-              : `${used.toLocaleString()} of ${limit.toLocaleString()} documents used this month`}
+              ? "Unlimited pages"
+              : `${used.toLocaleString()} of ${limit.toLocaleString()} pages used this month`}
+            {addonPages > 0 && (
+              <span className="text-success ml-2">· {addonPages.toLocaleString()} bonus pages remaining</span>
+            )}
           </p>
         </div>
         <div className="text-right">
@@ -55,7 +59,7 @@ export default function UsageBar({ used, limit, plan }: Props) {
             <span>
               {limit - used > 0
                 ? `${(limit - used).toLocaleString()} remaining`
-                : "Limit reached"}
+                : "Monthly limit reached"}
             </span>
           </div>
         </div>
@@ -63,7 +67,7 @@ export default function UsageBar({ used, limit, plan }: Props) {
 
       {pct >= 100 && (
         <p className="text-error text-xs font-mono">
-          You&apos;ve reached your monthly limit. Upgrade to process more documents.
+          Monthly limit reached.{addonPages > 0 ? ` You have ${addonPages.toLocaleString()} bonus pages available.` : " Upgrade or buy extra pages to continue."}
         </p>
       )}
     </div>

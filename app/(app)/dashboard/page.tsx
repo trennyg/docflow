@@ -9,7 +9,7 @@ export default async function DashboardPage() {
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("name, plan, credits_used, credits_limit")
+    .select("name, plan, credits_used, credits_limit, addon_pages")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -29,7 +29,8 @@ export default async function DashboardPage() {
   const orgName = org?.name ?? user.email ?? "your organisation";
   const plan = org?.plan ?? "free";
   const creditsUsed = org?.credits_used ?? 0;
-  const creditsLimit = org?.credits_limit ?? 45;
+  const creditsLimit = org?.credits_limit ?? 30;
+  const addonPages = org?.addon_pages ?? 0;
   const firstName = orgName.split(/[\s@]/)[0];
   const peopleThisMonth = creditsUsed;
 
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Usage */}
-      <UsageBar used={creditsUsed} limit={creditsLimit} plan={plan} />
+      <UsageBar used={creditsUsed} limit={creditsLimit} plan={plan} addonPages={addonPages} />
 
       {/* Quick upload */}
       <QuickUpload />

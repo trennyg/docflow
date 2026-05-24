@@ -6,6 +6,7 @@ export type UploadFile = {
   id: string;
   file: File;
   docType: DocType;
+  pageCount?: number; // undefined while PDF is being counted
 };
 
 type Props = {
@@ -13,6 +14,13 @@ type Props = {
   onRemove: (fileId: string) => void;
   onDocTypeChange: (fileId: string, docType: DocType) => void;
 };
+
+function pageLabel(uf: UploadFile) {
+  const isPdf = uf.file.type === "application/pdf" || uf.file.name.toLowerCase().endsWith(".pdf");
+  if (!isPdf) return "1 pg";
+  if (uf.pageCount === undefined) return "counting…";
+  return `${uf.pageCount} pg${uf.pageCount !== 1 ? "s" : ""}`;
+}
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -33,13 +41,16 @@ export default function FileList({ files, onRemove, onDocTypeChange }: Props) {
   if (files.length === 0) return null;
   return (
     <div className="space-y-1.5">
-      {files.map(({ id, file, docType }) => (
-        <div key={id} className="flex items-center gap-2.5 bg-bg border border-border rounded-lg px-3 py-2 group hover:border-border/80 transition-colors">
+      {files.map((uf) => {
+        const { id, file, docType } = uf;
+        return (
+        <div key={id} className="flex items-center gap-2.5 bg-bg border border-border rounded-lg px-3 py-2 group hover:border-border/80 transition-colors" data-file-id={id}>
           {fileIcon(file.name)}
 
           <span className="text-text-primary text-xs flex-1 truncate font-mono">{file.name}</span>
 
           <span className="text-text-muted text-xs font-mono shrink-0">{fmtSize(file.size)}</span>
+          <span className="text-text-muted text-xs font-mono shrink-0">{pageLabel(uf)}</span>
 
           <select
             value={docType}
@@ -68,7 +79,8 @@ export default function FileList({ files, onRemove, onDocTypeChange }: Props) {
             </svg>
           </button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -57,6 +57,20 @@ export const DUMMY_EXTRACTED: Record<DocType, Record<string, string>> = {
     bill_month: "April 2025",
     amount_due: "1250",
   },
+  index2: {
+    buyer_name: "Sample Buyer",
+    seller_name: "Sample Seller",
+    property_address: "Flat 4B, Sample Tower, Mumbai — 400001",
+    property_value: "8500000",
+    registration_date: "01/01/2024",
+  },
+  car_quotation: {
+    vehicle_make: "Maruti Suzuki",
+    vehicle_model: "Swift ZXi",
+    quotation_amount: "850000",
+    on_road_price: "950000",
+    dealer_name: "Sample Motors Pvt Ltd",
+  },
   other: {
     document: "Unclassified document",
   },

@@ -94,8 +94,8 @@ export default function LandingPricing() {
                 )}
                 <p className="text-text-muted text-xs font-mono mt-1">
                   {plan.limit === -1
-                    ? "Unlimited documents"
-                    : `${plan.limit.toLocaleString()} documents/mo`}
+                    ? "Unlimited pages"
+                    : `${plan.limit.toLocaleString()} pages/mo`}
                 </p>
               </div>
 
