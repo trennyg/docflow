@@ -17,9 +17,10 @@ export async function requireUser() {
   if (process.env.NODE_ENV === "development") {
     const cookieStore = cookies();
     if (cookieStore.get("dev_bypass")?.value === "true") {
+      const orgId = cookieStore.get("dev_org_id")?.value ?? DEV_USER_ID;
       return {
         supabase: createAdminClient(),
-        user: { id: DEV_USER_ID, email: DEV_USER_EMAIL as string | undefined },
+        user: { id: orgId, email: DEV_USER_EMAIL as string | undefined },
         devMode: true as const,
       };
     }

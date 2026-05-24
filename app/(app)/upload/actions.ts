@@ -23,7 +23,7 @@ export async function devProcessUpload(formData: FormData): Promise<{ jobId: str
   if (cookieStore.get("dev_bypass")?.value !== "true") throw new Error("Dev bypass not active");
 
   const supabase = createAdminClient();
-  const orgId = DEV_USER_ID;
+  const orgId = cookieStore.get("dev_org_id")?.value ?? DEV_USER_ID;
 
   const applicants: ApplicantEntry[] = JSON.parse(formData.get("applicants") as string);
 

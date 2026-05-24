@@ -1,15 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DEV_USER_ID } from "@/lib/server-auth";
 
 async function enterDevMode() {
   "use server";
   if (process.env.NODE_ENV !== "development") return;
 
-  const supabase = createClient();
+  // Must use admin client — anon client has no session so RLS blocks the insert
+  const supabase = createAdminClient();
 
-  // Ensure the test org exists — safe to call repeatedly
   await supabase.from("organizations").upsert(
     {
       id: DEV_USER_ID,
@@ -22,12 +22,9 @@ async function enterDevMode() {
     { onConflict: "id", ignoreDuplicates: true }
   );
 
-  cookies().set("dev_bypass", "true", {
-    path: "/",
-    maxAge: 60 * 60 * 8, // 8 hours
-    sameSite: "lax",
-    httpOnly: false,
-  });
+  const cookieOpts = { path: "/", maxAge: 60 * 60 * 8, sameSite: "lax" as const, httpOnly: false };
+  cookies().set("dev_bypass", "true", cookieOpts);
+  cookies().set("dev_org_id", DEV_USER_ID, cookieOpts);
 
   redirect("/dashboard");
 }
