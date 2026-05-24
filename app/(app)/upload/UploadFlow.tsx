@@ -34,27 +34,46 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
 
     setApplicants((prev) => {
       const next = prev.map((a) => ({ ...a, fileIds: [...a.fileIds] }));
+      const fileEntries = Object.entries(nextFiles);
 
-      // Continue numbering from however many auto-named applicants already exist
-      let fallbackSeq = next.filter((a) => /^Applicant \d+$/.test(a.label)).length + 1;
+      // Detect a name for each incoming file (null = ambiguous)
+      const detected = fileEntries.map(([id, uf]) => ({
+        id,
+        name: detectApplicantName(uf.file.name),
+      }));
 
-      const nameMap: Record<string, string[]> = {};
-      Object.entries(nextFiles).forEach(([id, uf]) => {
-        const detected = detectApplicantName(uf.file.name);
-        // null = unrecognisable name (WhatsApp, timestamp, etc.) — each gets its own slot
-        const name = detected ?? `Applicant ${fallbackSeq++}`;
-        if (!nameMap[name]) nameMap[name] = [];
-        nameMap[name].push(id);
-      });
+      const distinctNames = [
+        ...new Set(detected.map((e) => e.name).filter((n): n is string => n !== null)),
+      ];
 
-      Object.entries(nameMap).forEach(([name, ids]) => {
-        const existing = next.find((a) => a.label === name);
+      if (distinctNames.length <= 1) {
+        // 0 or 1 distinct names → everything into one group
+        const groupName = distinctNames[0] ?? "Applicant 1";
+        const existing = next.find((a) => a.label === groupName);
+        const allIds = fileEntries.map(([id]) => id);
         if (existing) {
-          existing.fileIds.push(...ids);
+          existing.fileIds.push(...allIds);
         } else {
-          next.push({ id: crypto.randomUUID(), label: name, fileIds: ids });
+          next.push({ id: crypto.randomUUID(), label: groupName, fileIds: allIds });
         }
-      });
+      } else {
+        // 2+ distinct names → split by detected name; ambiguous files → "Applicant 1"
+        const nameMap: Record<string, string[]> = {};
+        detected.forEach(({ id, name }) => {
+          const group = name ?? "Applicant 1";
+          if (!nameMap[group]) nameMap[group] = [];
+          nameMap[group].push(id);
+        });
+        Object.entries(nameMap).forEach(([name, ids]) => {
+          const existing = next.find((a) => a.label === name);
+          if (existing) {
+            existing.fileIds.push(...ids);
+          } else {
+            next.push({ id: crypto.randomUUID(), label: name, fileIds: ids });
+          }
+        });
+      }
+
       return next;
     });
   }, []);
