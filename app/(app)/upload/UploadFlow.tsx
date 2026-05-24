@@ -154,7 +154,7 @@ export default function UploadFlow({ orgId }: Props) {
         .update({ status: "complete" })
         .eq("id", jobId);
 
-      router.push(`/app/jobs/${jobId}`);
+      router.push(`/jobs/${jobId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setSubmitting(false);

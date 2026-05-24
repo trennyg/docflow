@@ -231,7 +231,7 @@ export default async function JobPage({
       <div className="flex items-start justify-between">
         <div>
           <Link
-            href="/app/jobs"
+            href="/jobs"
             className="text-text-muted hover:text-text-primary text-sm transition-colors"
           >
             ← Jobs

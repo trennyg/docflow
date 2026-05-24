@@ -37,7 +37,7 @@ export default function RecentJobs({ jobs }: Props) {
         </svg>
         <p className="text-text-muted text-sm">No jobs yet.</p>
         <Link
-          href="/app/upload"
+          href="/upload"
           className="mt-2 inline-block text-accent text-sm hover:underline"
         >
           Upload your first documents →
@@ -51,7 +51,7 @@ export default function RecentJobs({ jobs }: Props) {
       <div className="flex items-center justify-between px-5 py-3 border-b border-border">
         <h3 className="text-text-primary text-sm font-medium">Recent jobs</h3>
         <Link
-          href="/app/jobs"
+          href="/jobs"
           className="text-accent text-xs hover:underline font-mono"
         >
           View all →
@@ -93,7 +93,7 @@ export default function RecentJobs({ jobs }: Props) {
               </td>
               <td className="px-5 py-3 text-right">
                 <Link
-                  href={`/app/jobs/${job.id}`}
+                  href={`/jobs/${job.id}`}
                   className="text-accent text-xs hover:underline font-mono"
                 >
                   View →

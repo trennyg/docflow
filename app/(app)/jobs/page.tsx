@@ -85,7 +85,7 @@ export default async function JobsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-text-primary text-xl font-semibold">Jobs</h1>
         <Link
-          href="/app/upload"
+          href="/upload"
           className="bg-accent hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           New upload →
@@ -109,7 +109,7 @@ export default async function JobsPage() {
           </svg>
           <p className="text-text-muted text-sm">No jobs yet.</p>
           <Link
-            href="/app/upload"
+            href="/upload"
             className="mt-3 inline-block text-accent text-sm hover:underline"
           >
             Upload your first documents →
@@ -214,7 +214,7 @@ export default async function JobsPage() {
                     {/* View */}
                     <td className="px-4 py-3">
                       <Link
-                        href={`/app/jobs/${job.id}`}
+                        href={`/jobs/${job.id}`}
                         className="text-accent hover:underline font-mono text-xs"
                       >
                         {job.id.slice(0, 8)}… →

@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function QuickUpload() {
   return (
     <Link
-      href="/app/upload"
+      href="/upload"
       className="group flex items-center gap-4 bg-card border border-border hover:border-accent/50 rounded-xl px-6 py-5 transition-colors"
     >
       <div className="w-10 h-10 rounded-full bg-accent/10 group-hover:bg-accent/20 flex items-center justify-center shrink-0 transition-colors">

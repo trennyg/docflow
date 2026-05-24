@@ -29,7 +29,7 @@ async function enterDevMode() {
     httpOnly: false,
   });
 
-  redirect("/app/dashboard");
+  redirect("/dashboard");
 }
 
 export default function DevLoginPage() {

@@ -14,8 +14,9 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Auth guard: redirect unauthenticated users away from /app/*
-  if (pathname.startsWith("/app") && !user) {
+  // Auth guard: protect all app routes (route group (app) strips the /app prefix)
+  const isAppRoute = /^\/(dashboard|upload|jobs|billing|settings)(\/|$)/.test(pathname);
+  if (isAppRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -24,12 +25,12 @@ export async function middleware(request: NextRequest) {
   // Skip login/verify if already authenticated
   if ((pathname === "/login" || pathname === "/verify") && user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/app/dashboard";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // Usage limit check: block access to /app/upload when at limit
-  if (pathname === "/app/upload" && user) {
+  // Usage limit check: block access to /upload when at limit
+  if (pathname === "/upload" && user) {
     const { data: org } = await supabase
       .from("organizations")
       .select("credits_used, credits_limit")
@@ -43,7 +44,7 @@ export async function middleware(request: NextRequest) {
 
     if (atLimit) {
       const url = request.nextUrl.clone();
-      url.pathname = "/app/billing";
+      url.pathname = "/billing";
       url.searchParams.set("upgrade", "1");
       return NextResponse.redirect(url);
     }

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(npm *)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "PowerShell(git *)"
     ]
   }
 }

@@ -102,7 +102,7 @@ function VerifyForm() {
       }
     }
 
-    router.replace("/app/dashboard");
+    router.replace("/dashboard");
   }
 
   return (
