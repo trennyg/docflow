@@ -1,81 +1,45 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useRef } from "react";
 import DropZone from "@/components/upload/DropZone";
-import ApplicantBuilder, { Applicant } from "@/components/upload/ApplicantBuilder";
-import { UploadFile } from "@/components/upload/FileQueue";
-import { detectDocType, detectApplicantName, DocType } from "@/lib/constants";
-import { DUMMY_EXTRACTED } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
-import { devProcessUpload } from "./actions";
+import FileList, { UploadFile } from "@/components/upload/FileList";
+import { detectDocType, DocType } from "@/lib/constants";
+import { processUpload, uploadExistingExcel, getMasterSheetUrl } from "./actions";
 
-type Props = { orgId: string; devMode?: boolean };
+type Props = {
+  orgId: string;
+  devMode?: boolean;
+  hasMasterSheet: boolean;
+};
 
-export default function UploadFlow({ orgId, devMode = false }: Props) {
-  const router = useRouter();
+type Stage = "upload" | "done";
+
+export default function UploadFlow({ hasMasterSheet }: Props) {
   const [files, setFiles] = useState<Record<string, UploadFile>>({});
-  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [stage, setStage] = useState<Stage>("upload");
+  const [extracted, setExtracted] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const [masterSheetUrl, setMasterSheetUrl] = useState<string | null>(null);
 
-  const totalFiles = Object.keys(files).length;
-  const hasUnselectedDocTypes = Object.values(files).some((f) => f.docType === "other");
+  // Excel upload state
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelDone, setExcelDone] = useState(hasMasterSheet);
+  const [excelError, setExcelError] = useState("");
+  const excelInputRef = useRef<HTMLInputElement>(null);
+
+  const fileList = Object.values(files);
+  const totalFiles = fileList.length;
+  const hasUndetected = fileList.some((f) => f.docType === "other");
 
   const handleFilesAdded = useCallback((newFiles: File[]) => {
-    const nextFiles: Record<string, UploadFile> = {};
+    const next: Record<string, UploadFile> = {};
     newFiles.forEach((file) => {
       const id = crypto.randomUUID();
-      nextFiles[id] = { id, file, docType: detectDocType(file.name) };
+      next[id] = { id, file, docType: detectDocType(file.name) };
     });
-
-    setFiles((prev) => ({ ...prev, ...nextFiles }));
-
-    setApplicants((prev) => {
-      const next = prev.map((a) => ({ ...a, fileIds: [...a.fileIds] }));
-      const fileEntries = Object.entries(nextFiles);
-
-      // Detect a name for each incoming file (null = ambiguous)
-      const detected = fileEntries.map(([id, uf]) => ({
-        id,
-        name: detectApplicantName(uf.file.name),
-      }));
-
-      const distinctNames = [
-        ...new Set(detected.map((e) => e.name).filter((n): n is string => n !== null)),
-      ];
-
-      if (distinctNames.length <= 1) {
-        // 0 or 1 distinct names → everything into one group
-        const groupName = distinctNames[0] ?? "Applicant 1";
-        const existing = next.find((a) => a.label === groupName);
-        const allIds = fileEntries.map(([id]) => id);
-        if (existing) {
-          existing.fileIds.push(...allIds);
-        } else {
-          next.push({ id: crypto.randomUUID(), label: groupName, fileIds: allIds });
-        }
-      } else {
-        // 2+ distinct names → split by detected name; ambiguous files → "Applicant 1"
-        const nameMap: Record<string, string[]> = {};
-        detected.forEach(({ id, name }) => {
-          const group = name ?? "Applicant 1";
-          if (!nameMap[group]) nameMap[group] = [];
-          nameMap[group].push(id);
-        });
-        Object.entries(nameMap).forEach(([name, ids]) => {
-          const existing = next.find((a) => a.label === name);
-          if (existing) {
-            existing.fileIds.push(...ids);
-          } else {
-            next.push({ id: crypto.randomUUID(), label: name, fileIds: ids });
-          }
-        });
-      }
-
-      return next;
-    });
+    setFiles((prev) => ({ ...prev, ...next }));
   }, []);
 
   function removeFile(fileId: string) {
@@ -84,9 +48,6 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
       delete next[fileId];
       return next;
     });
-    setApplicants((prev) =>
-      prev.map((a) => ({ ...a, fileIds: a.fileIds.filter((id) => id !== fileId) }))
-    );
   }
 
   function changeDocType(fileId: string, docType: DocType) {
@@ -95,148 +56,123 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
     );
   }
 
+  async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExcelUploading(true);
+    setExcelError("");
+    try {
+      const fd = new FormData();
+      fd.append("excel", file);
+      await uploadExistingExcel(fd);
+      setExcelDone(true);
+    } catch (err) {
+      setExcelError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setExcelUploading(false);
+      if (excelInputRef.current) excelInputRef.current.value = "";
+    }
+  }
+
   async function handleProcess() {
-    const activeApplicants = applicants.filter((a) => a.fileIds.length > 0);
-    if (activeApplicants.length === 0) {
+    if (totalFiles === 0) {
       setError("Add at least one file before processing.");
       return;
     }
-
     setSubmitting(true);
     setError("");
 
     try {
-      if (devMode) {
-        await handleProcessDev(activeApplicants);
-      } else {
-        await handleProcessProd(activeApplicants);
-      }
+      setProgress("Uploading files…");
+      const fd = new FormData();
+
+      const structure = fileList.map((uf, i) => ({
+        fileKey: `file_${i}`,
+        docType: uf.docType,
+      }));
+      fd.append("files", JSON.stringify(structure));
+      fileList.forEach((uf, i) => fd.append(`file_${i}`, uf.file, uf.file.name));
+
+      setProgress("Extracting data…");
+      const result = await processUpload(fd);
+
+      setProgress("Getting download link…");
+      const url = await getMasterSheetUrl();
+
+      setExtracted(result.extracted);
+      setMasterSheetUrl(url);
+      setStage("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
       setSubmitting(false);
       setProgress("");
     }
   }
 
-  async function handleProcessDev(activeApplicants: Applicant[]) {
-    setProgress("Preparing upload…");
-    const formData = new FormData();
-
-    const structure = activeApplicants.map((applicant, i) => ({
-      label: applicant.label,
-      fileKeys: applicant.fileIds
-        .map((id, j) => (files[id] ? `file_${i}_${j}` : null))
-        .filter(Boolean) as string[],
-      docTypes: applicant.fileIds
-        .map((id) => files[id]?.docType)
-        .filter(Boolean) as DocType[],
-    }));
-
-    formData.append("applicants", JSON.stringify(structure));
-
-    activeApplicants.forEach((applicant, i) => {
-      applicant.fileIds.forEach((fileId, j) => {
-        const uf = files[fileId];
-        if (uf) formData.append(`file_${i}_${j}`, uf.file, uf.file.name);
-      });
-    });
-
-    setProgress("Processing (dev mode)…");
-    const { jobId } = await devProcessUpload(formData);
-    router.push(`/jobs/${jobId}`);
+  function handleAddAnother() {
+    setFiles({});
+    setExtracted({});
+    setMasterSheetUrl(null);
+    setError("");
+    setStage("upload");
   }
 
-  async function handleProcessProd(activeApplicants: Applicant[]) {
-    const supabase = createClient();
+  if (stage === "done") {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-text-primary text-xl font-semibold">Row added to sheet</h1>
+            <p className="text-text-muted text-sm mt-0.5">Extracted data has been appended to your master sheet.</p>
+          </div>
+        </div>
 
-    // Count files that will actually be uploaded
-    const totalDocs = activeApplicants.reduce(
-      (sum, a) => sum + a.fileIds.filter((id) => !!files[id]).length,
-      0
+        {/* Extracted data review */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <h2 className="text-text-primary text-sm font-medium">Extracted fields</h2>
+          {Object.keys(extracted).length === 0 ? (
+            <p className="text-text-muted text-sm">No fields extracted.</p>
+          ) : (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2">
+              {Object.entries(extracted).map(([k, v]) => (
+                <div key={k} className="min-w-0">
+                  <dt className="text-text-muted text-xs font-mono truncate">{k.replace(/_/g, " ")}</dt>
+                  <dd className="text-text-primary text-xs font-mono mt-0.5 truncate">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          {masterSheetUrl && (
+            <a
+              href={masterSheetUrl}
+              download="master_sheet.xlsx"
+              className="flex items-center gap-2 bg-success/10 hover:bg-success/20 border border-success/30 text-success text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Download Master Sheet
+            </a>
+          )}
+          <button
+            onClick={handleAddAnother}
+            className="flex items-center gap-2 bg-accent hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+          >
+            Add Another Person →
+          </button>
+        </div>
+      </div>
     );
-
-    // Check document quota before touching the database
-    setProgress("Checking quota…");
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("credits_used, credits_limit")
-      .eq("id", orgId)
-      .single();
-
-    if (org && org.credits_limit !== -1 && org.credits_used + totalDocs > org.credits_limit) {
-      const remaining = Math.max(0, org.credits_limit - org.credits_used);
-      throw new Error(
-        `You have ${remaining.toLocaleString()} document${remaining !== 1 ? "s" : ""} remaining this month. Upgrade to process more.`
-      );
-    }
-
-    // 1. Create job
-    setProgress("Creating job…");
-    const { data: job, error: jobErr } = await supabase
-      .from("jobs")
-      .insert({
-        org_id: orgId,
-        status: "processing",
-        job_type: "kyc",
-        applicant_count: activeApplicants.length,
-      })
-      .select("id")
-      .single();
-
-    if (jobErr || !job) throw new Error(jobErr?.message ?? "Failed to create job");
-    const jobId: string = job.id;
-
-    // 2. Per applicant: insert record, upload files, insert documents
-    for (const applicant of activeApplicants) {
-      setProgress(`Uploading ${applicant.label}…`);
-
-      const { data: appRecord, error: appErr } = await supabase
-        .from("applicants")
-        .insert({ job_id: jobId, org_id: orgId, label: applicant.label, status: "pending" })
-        .select("id")
-        .single();
-
-      if (appErr || !appRecord) continue;
-      const applicantId: string = appRecord.id;
-      const extractedData: Record<string, string> = {};
-
-      for (const fileId of applicant.fileIds) {
-        const uf = files[fileId];
-        if (!uf) continue;
-
-        const storagePath = `${orgId}/${jobId}/${applicantId}/${uf.file.name}`;
-        const { error: uploadErr } = await supabase.storage
-          .from("documents")
-          .upload(storagePath, uf.file, { upsert: true });
-
-        if (!uploadErr) {
-          await supabase.from("documents").insert({
-            applicant_id: applicantId,
-            job_id: jobId,
-            org_id: orgId,
-            doc_type: uf.docType,
-            storage_path: storagePath,
-            status: "complete",
-            confidence: 0.95,
-            extracted: DUMMY_EXTRACTED[uf.docType] ?? DUMMY_EXTRACTED.other,
-          });
-          Object.assign(extractedData, DUMMY_EXTRACTED[uf.docType] ?? {});
-        }
-      }
-
-      await supabase
-        .from("applicants")
-        .update({ status: "complete", extracted: extractedData })
-        .eq("id", applicantId);
-    }
-
-    // 3. Mark job complete and record document usage
-    await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
-    await supabase
-      .from("organizations")
-      .update({ credits_used: (org?.credits_used ?? 0) + totalDocs })
-      .eq("id", orgId);
-    router.push(`/jobs/${jobId}`);
   }
 
   return (
@@ -244,52 +180,93 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
       <div>
         <h1 className="text-text-primary text-xl font-semibold">Upload Documents</h1>
         <p className="text-text-muted text-sm mt-1">
-          Drop KYC documents below. We&apos;ll auto-detect document types and group by applicant.
+          Drop all documents for this person. We&apos;ll extract the data and add a row to your master sheet.
         </p>
       </div>
 
-      <DropZone onFilesAdded={handleFilesAdded} currentCount={totalFiles} />
-
-      {totalFiles > 0 && (
-        <>
-          <div className="flex items-center justify-between">
-            <h2 className="text-text-primary text-sm font-medium">
-              {totalFiles} file{totalFiles !== 1 ? "s" : ""} ·{" "}
-              {applicants.filter((a) => a.fileIds.length > 0).length} applicant
-              {applicants.filter((a) => a.fileIds.length > 0).length !== 1 ? "s" : ""}
-            </h2>
-            <p className="text-text-muted text-xs">
-              Drag files between groups to reorganise
+      {/* Excel upload — only shown if no master sheet exists yet */}
+      {!excelDone && (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div>
+            <h2 className="text-text-primary text-sm font-medium">Upload your existing Excel sheet (optional)</h2>
+            <p className="text-text-muted text-xs mt-1">
+              We&apos;ll append new rows to your existing format. Skip this to use our default columns.
             </p>
           </div>
+          <div className="flex items-center gap-3">
+            <input
+              ref={excelInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleExcelUpload}
+            />
+            <button
+              onClick={() => excelInputRef.current?.click()}
+              disabled={excelUploading}
+              className="flex items-center gap-2 bg-bg border border-border hover:border-accent/50 text-text-primary text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {excelUploading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Upload Excel
+                </>
+              )}
+            </button>
+            <span className="text-text-muted text-xs">.xlsx and .xls only</span>
+          </div>
+          {excelError && <p className="text-error text-xs font-mono">{excelError}</p>}
+        </div>
+      )}
 
-          <ApplicantBuilder
-            files={files}
-            applicants={applicants}
-            onChange={setApplicants}
-            onRemoveFile={removeFile}
+      {excelDone && !hasMasterSheet && (
+        <div className="flex items-center gap-2 text-success text-xs font-mono bg-success/5 border border-success/20 rounded-lg px-3 py-2">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Your Excel has been saved as the master sheet. New rows will match your column format.
+        </div>
+      )}
+
+      {/* Drop zone */}
+      <DropZone onFilesAdded={handleFilesAdded} currentCount={totalFiles} />
+
+      {/* File list */}
+      {totalFiles > 0 && (
+        <>
+          <FileList
+            files={fileList}
+            onRemove={removeFile}
             onDocTypeChange={changeDocType}
           />
 
-          {error && (
-            <p className="text-error text-sm font-mono">{error}</p>
-          )}
+          {error && <p className="text-error text-sm font-mono">{error}</p>}
 
-          <div className="flex items-center justify-between pt-2">
-            <p className={`text-xs font-mono ${hasUnselectedDocTypes ? "text-warning" : "text-text-muted"}`}>
+          <div className="flex items-center justify-between pt-1">
+            <p className={`text-xs font-mono ${hasUndetected ? "text-warning" : "text-text-muted"}`}>
               {submitting
                 ? progress
-                : hasUnselectedDocTypes
+                : hasUndetected
                 ? "Select document type for all files"
-                : "Ready to process"}
+                : `${totalFiles} file${totalFiles !== 1 ? "s" : ""} ready`}
             </p>
             <span
-              title={hasUnselectedDocTypes ? "Please select document type for all files" : undefined}
+              title={hasUndetected ? "Please select document type for all files" : undefined}
               className="inline-block"
             >
               <button
                 onClick={handleProcess}
-                disabled={submitting || hasUnselectedDocTypes}
+                disabled={submitting || hasUndetected}
                 className="bg-accent hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm flex items-center gap-2"
               >
                 {submitting ? (
@@ -301,7 +278,7 @@ export default function UploadFlow({ orgId, devMode = false }: Props) {
                     Processing…
                   </>
                 ) : (
-                  "Process Documents →"
+                  "Extract & Add to Sheet →"
                 )}
               </button>
             </span>

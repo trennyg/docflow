@@ -3,7 +3,13 @@
     "allow": [
       "PowerShell(npm *)",
       "PowerShell(New-Item *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(npx supabase *)",
+      "Bash(ls supabase *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\trenn\\\\docflow\\\\.next\\\\types\" -ErrorAction SilentlyContinue)",
+      "Bash(git add *)"
     ]
   }
 }

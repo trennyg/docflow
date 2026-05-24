@@ -1,4 +1,4 @@
-export const PLANS = {
+export const PLANS: Record<string, { label: string; limit: number; price: number; annualPrice: number; features: string[] }> = {
   free: {
     label: "Free",
     limit: 45,
@@ -47,9 +47,9 @@ export const PLANS = {
       "Custom integrations",
     ],
   },
-} as const;
+};
 
-export type PlanKey = keyof typeof PLANS;
+export type PlanKey = "free" | "starter" | "growth" | "unlimited";
 
 export const PLAN_ORDER: PlanKey[] = ["free", "starter", "growth", "unlimited"];
 
@@ -110,4 +110,48 @@ export function detectApplicantName(filename: string): string | null {
 
   if (!name) return null;
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+export type FieldKey =
+  | "name" | "pan_number" | "aadhaar_number" | "dob" | "phone"
+  | "address" | "father_name" | "gender" | "passport_number"
+  | "employer" | "salary" | "email" | "pincode" | "city" | "state";
+
+export const COLUMN_MAPPINGS: Record<FieldKey, string[]> = {
+  name: ["full name", "name", "applicant name", "customer name", "client name", "candidate name", "employee name", "member name", "naam", "poora naam"],
+  pan_number: ["pan", "pan no", "pan no.", "pan number", "pan card", "permanent account number", "income tax pan", "it pan"],
+  aadhaar_number: ["aadhaar", "aadhar", "adhar", "uid", "uidai", "aadhaar no", "aadhar number", "aadhaar card", "aadhaar id"],
+  dob: ["dob", "date of birth", "birth date", "d.o.b", "d.o.b.", "birthdate", "date of birth (dd/mm/yyyy)", "janm tithi"],
+  phone: ["mobile", "phone", "contact", "mobile no", "phone no", "contact no", "mobile number", "phone number", "cell", "mob", "mob no", "whatsapp", "whatsapp no"],
+  address: ["address", "residence", "home address", "residential address", "current address", "permanent address", "full address", "address (as per aadhaar)", "pata"],
+  father_name: ["father", "father name", "father's name", "f/n", "father's full name", "papa ka naam", "s/o", "son of"],
+  gender: ["gender", "sex", "m/f", "male/female", "ling"],
+  passport_number: ["passport", "passport no", "passport number", "pp no", "travel document"],
+  employer: ["employer", "company", "organisation", "organization", "office", "firm", "company name", "employer name"],
+  salary: ["salary", "income", "monthly salary", "gross salary", "net salary", "ctc", "monthly income", "take home"],
+  email: ["email", "email id", "e-mail", "mail", "email address"],
+  pincode: ["pincode", "pin", "zip", "pin code", "postal code"],
+  city: ["city", "town", "sheher", "district"],
+  state: ["state", "pradesh", "province"],
+};
+
+// Reverse lookup: normalized alias → field key
+const _reverseMap: Record<string, FieldKey> = {};
+for (const [field, aliases] of Object.entries(COLUMN_MAPPINGS) as [FieldKey, string[]][]) {
+  for (const alias of aliases) {
+    _reverseMap[alias] = field;
+  }
+}
+
+export function matchColumn(header: string): FieldKey | null {
+  return _reverseMap[header.toLowerCase().trim()] ?? null;
+}
+
+export function mapColumnsToFields(headers: string[]): Record<string, FieldKey> {
+  const result: Record<string, FieldKey> = {};
+  for (const header of headers) {
+    const field = matchColumn(header);
+    if (field) result[header] = field;
+  }
+  return result;
 }
