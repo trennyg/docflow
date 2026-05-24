@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/server-auth";
 import Sidebar from "@/components/dashboard/Sidebar";
 
 export default async function AppLayout({
@@ -7,12 +6,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
+  const { supabase, user, devMode } = await requireUser();
 
   const { data: org } = await supabase
     .from("organizations")
@@ -27,6 +21,13 @@ export default async function AppLayout({
     <div className="flex min-h-screen bg-bg">
       <Sidebar />
       <div className="flex-1 flex flex-col">
+        {devMode && (
+          <div className="bg-warning/10 border-b border-warning/30 px-6 py-2 text-center">
+            <p className="text-warning text-xs font-mono">
+              ⚠️ Dev mode — auth bypassed. Not for production.
+            </p>
+          </div>
+        )}
         <header className="h-14 border-b border-border flex items-center justify-between px-6">
           <span className="text-text-primary font-medium text-sm">{orgName}</span>
           <span

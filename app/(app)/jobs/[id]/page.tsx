@@ -1,6 +1,6 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/server-auth";
 import { DOC_TYPES } from "@/lib/constants";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 
@@ -184,11 +184,7 @@ export default async function JobPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const { data: job } = await supabase
     .from("jobs")

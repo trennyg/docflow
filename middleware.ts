@@ -6,6 +6,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Dev bypass: skip all auth logic when cookie is present (development only)
+  if (
+    process.env.NODE_ENV === "development" &&
+    request.cookies.get("dev_bypass")?.value === "true"
+  ) {
+    return supabaseResponse;
+  }
+
   // Auth guard: redirect unauthenticated users away from /app/*
   if (pathname.startsWith("/app") && !user) {
     const url = request.nextUrl.clone();

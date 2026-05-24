@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/server-auth";
 import { PLANS, PlanKey } from "@/lib/constants";
 import UsageBar from "@/components/dashboard/UsageBar";
 import PlanSelector from "@/components/billing/PlanSelector";
@@ -10,11 +9,7 @@ export default async function BillingPage({
 }: {
   searchParams: { upgrade?: string };
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const { data: org } = await supabase
     .from("organizations")

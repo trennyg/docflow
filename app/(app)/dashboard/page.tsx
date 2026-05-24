@@ -1,15 +1,10 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/server-auth";
 import UsageBar from "@/components/dashboard/UsageBar";
 import RecentJobs from "@/components/dashboard/RecentJobs";
 import QuickUpload from "@/components/dashboard/QuickUpload";
 
 export default async function DashboardPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const { data: org } = await supabase
     .from("organizations")
