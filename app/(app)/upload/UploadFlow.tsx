@@ -8,10 +8,11 @@ import { UploadFile } from "@/components/upload/FileQueue";
 import { detectDocType, detectApplicantName, DocType } from "@/lib/constants";
 import { DUMMY_EXTRACTED } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { devProcessUpload } from "./actions";
 
-type Props = { orgId: string };
+type Props = { orgId: string; devMode?: boolean };
 
-export default function UploadFlow({ orgId }: Props) {
+export default function UploadFlow({ orgId, devMode = false }: Props) {
   const router = useRouter();
   const [files, setFiles] = useState<Record<string, UploadFile>>({});
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -76,90 +77,114 @@ export default function UploadFlow({ orgId }: Props) {
 
     setSubmitting(true);
     setError("");
-    const supabase = createClient();
 
     try {
-      // 1. Create job
-      setProgress("Creating job…");
-      const { data: job, error: jobErr } = await supabase
-        .from("jobs")
-        .insert({
-          org_id: orgId,
-          status: "processing",
-          job_type: "kyc",
-          applicant_count: activeApplicants.length,
-        })
-        .select("id")
-        .single();
-
-      if (jobErr || !job) throw new Error(jobErr?.message ?? "Failed to create job");
-      const jobId: string = job.id;
-
-      // 2. Per applicant: insert record, upload files, insert documents
-      for (const applicant of activeApplicants) {
-        setProgress(`Uploading ${applicant.label}…`);
-
-        const { data: appRecord, error: appErr } = await supabase
-          .from("applicants")
-          .insert({
-            job_id: jobId,
-            org_id: orgId,
-            label: applicant.label,
-            status: "pending",
-          })
-          .select("id")
-          .single();
-
-        if (appErr || !appRecord) continue;
-        const applicantId: string = appRecord.id;
-
-        const extractedData: Record<string, string> = {};
-
-        for (const fileId of applicant.fileIds) {
-          const uf = files[fileId];
-          if (!uf) continue;
-
-          const storagePath = `${orgId}/${jobId}/${applicantId}/${uf.file.name}`;
-
-          const { error: uploadErr } = await supabase.storage
-            .from("documents")
-            .upload(storagePath, uf.file, { upsert: true });
-
-          if (!uploadErr) {
-            await supabase.from("documents").insert({
-              applicant_id: applicantId,
-              job_id: jobId,
-              org_id: orgId,
-              doc_type: uf.docType,
-              storage_path: storagePath,
-              status: "complete",
-              confidence: 0.95,
-              extracted: DUMMY_EXTRACTED[uf.docType] ?? DUMMY_EXTRACTED.other,
-            });
-            // Merge dummy data per doc type into applicant extracted blob
-            Object.assign(extractedData, DUMMY_EXTRACTED[uf.docType] ?? {});
-          }
-        }
-
-        // Mock: immediately mark applicant complete with merged dummy data
-        await supabase
-          .from("applicants")
-          .update({ status: "complete", extracted: extractedData })
-          .eq("id", applicantId);
+      if (devMode) {
+        await handleProcessDev(activeApplicants);
+      } else {
+        await handleProcessProd(activeApplicants);
       }
-
-      // 3. Mark job complete
-      await supabase
-        .from("jobs")
-        .update({ status: "complete" })
-        .eq("id", jobId);
-
-      router.push(`/jobs/${jobId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setSubmitting(false);
       setProgress("");
     }
+  }
+
+  async function handleProcessDev(activeApplicants: Applicant[]) {
+    setProgress("Preparing upload…");
+    const formData = new FormData();
+
+    const structure = activeApplicants.map((applicant, i) => ({
+      label: applicant.label,
+      fileKeys: applicant.fileIds
+        .map((id, j) => (files[id] ? `file_${i}_${j}` : null))
+        .filter(Boolean) as string[],
+      docTypes: applicant.fileIds
+        .map((id) => files[id]?.docType)
+        .filter(Boolean) as DocType[],
+    }));
+
+    formData.append("applicants", JSON.stringify(structure));
+
+    activeApplicants.forEach((applicant, i) => {
+      applicant.fileIds.forEach((fileId, j) => {
+        const uf = files[fileId];
+        if (uf) formData.append(`file_${i}_${j}`, uf.file, uf.file.name);
+      });
+    });
+
+    setProgress("Processing (dev mode)…");
+    const { jobId } = await devProcessUpload(formData);
+    router.push(`/jobs/${jobId}`);
+  }
+
+  async function handleProcessProd(activeApplicants: Applicant[]) {
+    const supabase = createClient();
+
+    // 1. Create job
+    setProgress("Creating job…");
+    const { data: job, error: jobErr } = await supabase
+      .from("jobs")
+      .insert({
+        org_id: orgId,
+        status: "processing",
+        job_type: "kyc",
+        applicant_count: activeApplicants.length,
+      })
+      .select("id")
+      .single();
+
+    if (jobErr || !job) throw new Error(jobErr?.message ?? "Failed to create job");
+    const jobId: string = job.id;
+
+    // 2. Per applicant: insert record, upload files, insert documents
+    for (const applicant of activeApplicants) {
+      setProgress(`Uploading ${applicant.label}…`);
+
+      const { data: appRecord, error: appErr } = await supabase
+        .from("applicants")
+        .insert({ job_id: jobId, org_id: orgId, label: applicant.label, status: "pending" })
+        .select("id")
+        .single();
+
+      if (appErr || !appRecord) continue;
+      const applicantId: string = appRecord.id;
+      const extractedData: Record<string, string> = {};
+
+      for (const fileId of applicant.fileIds) {
+        const uf = files[fileId];
+        if (!uf) continue;
+
+        const storagePath = `${orgId}/${jobId}/${applicantId}/${uf.file.name}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("documents")
+          .upload(storagePath, uf.file, { upsert: true });
+
+        if (!uploadErr) {
+          await supabase.from("documents").insert({
+            applicant_id: applicantId,
+            job_id: jobId,
+            org_id: orgId,
+            doc_type: uf.docType,
+            storage_path: storagePath,
+            status: "complete",
+            confidence: 0.95,
+            extracted: DUMMY_EXTRACTED[uf.docType] ?? DUMMY_EXTRACTED.other,
+          });
+          Object.assign(extractedData, DUMMY_EXTRACTED[uf.docType] ?? {});
+        }
+      }
+
+      await supabase
+        .from("applicants")
+        .update({ status: "complete", extracted: extractedData })
+        .eq("id", applicantId);
+    }
+
+    // 3. Mark job complete
+    await supabase.from("jobs").update({ status: "complete" }).eq("id", jobId);
+    router.push(`/jobs/${jobId}`);
   }
 
   return (

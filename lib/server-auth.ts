@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
 const DEV_USER_EMAIL = "dev@test.local";
@@ -17,7 +18,7 @@ export async function requireUser() {
     const cookieStore = cookies();
     if (cookieStore.get("dev_bypass")?.value === "true") {
       return {
-        supabase,
+        supabase: createAdminClient(),
         user: { id: DEV_USER_ID, email: DEV_USER_EMAIL as string | undefined },
         devMode: true as const,
       };
